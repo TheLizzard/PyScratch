@@ -1,2 +1,2 @@
 # PyScratch
-This is a Scratch implementation in python.
+This is a python implementation of Scratch.
