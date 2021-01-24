@@ -129,4 +129,5 @@ dmypy.json
 .pyre/
 
 # Custom
-src/gui/.threadsafe
+src/documentation.modpy
+debug.txt
