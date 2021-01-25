@@ -7,8 +7,8 @@ from physics import Vector
 from graphics import Costume
 
 
-INTERACT_WITH_PHYSICS = True
-INTERACT_WITH_GRAVITY = True
+INTERACT_WITH_PHYSICS = False
+INTERACT_WITH_GRAVITY = False
 INTERACT_WITH_GROUND = True
 
 GRAVITY = 9.81
@@ -76,6 +76,9 @@ class BasicSprite:
         self.forces += force
 
     def draw(self, screen):
+        pass
+
+    def register(self, screen):
         self.screen = screen
 
 
@@ -83,8 +86,13 @@ class Sprite(BasicSprite):
     def __init__(self, sprite_file_location=None, **kwargs):
         super().__init__(**kwargs)
         self.current_costume_idx = 0
-        self.costumes = [Costume(size=(0, 0), changable=False, hidden=True)]
+        self.costumes = [Costume(size=(0, 0))]
         self.costume_details = [self.costumes[0].get_details()]
+
+        self.sprite_changed = True
+        self.hidden = False
+        self._rotation = 0
+        self.scale = 1
 
     def destroy(self):
         for costume in self.costumes:
@@ -93,6 +101,7 @@ class Sprite(BasicSprite):
     def remove_costume(self, idx):
         assert idx != 0, "You can't remove the 0th costume."
         costume = self.costumes[idx]
+        costume.remove()
         del self.costumes[idx]
         del self.costume_details[idx]
 
@@ -105,22 +114,60 @@ class Sprite(BasicSprite):
 
     def set_costume(self, idx):
         current_costume = self.costumes[self.current_costume_idx]
-        current_costume.hide()
+        current_costume.remove()
         assert isinstance(idx, int), "idx must be an int."
         assert len(self.costumes) > idx, "Index out of range."
         assert idx >= 0, "Must be a +ve int."
         self.current_costume_idx = idx
-        new_costume = self.costumes[self.current_costume_idx]
-        new_costume.show()
+        self.sprite_changed = True
+        self.show()
 
     def draw(self, screen):
-        super().draw(screen)
-        costume = self.costumes[self.current_costume_idx]
-        costume.draw(tuple(self.pos))
+        if self.sprite_changed:
+            costume = self.costumes[self.current_costume_idx]
+            costume.draw(tuple(self.pos), rotation=self._rotation, scale=self._scale)
+            self.sprite_changed = False
 
-    def set_canvas(self, canvas):
+    def register(self, screen):
+        super().register(screen)
         for costume in self.costumes:
-            costume.set_canvas(canvas)
+            costume.set_canvas(screen.canvas)
+
+    @property
+    def rotation(self):
+        return self._rotation
+
+    @rotation.setter
+    def rotation(self, new_rotation):
+        self._rotation = new_rotation
+        self.sprite_changed = True
+
+    def rotate(self, delta_theta):
+        self._rotation += delta_theta
+        self.sprite_changed = True
+
+    @property
+    def scale(self):
+        return self._scale
+
+    @scale.setter
+    def scale(self, new_scale):
+        self._scale = new_scale
+        self.sprite_changed = True
+
+    def reset_image(self):
+        # Undo all of the changes we made to the sprite:
+        self._scale = 1
+        self._rotation = 0
+        self.sprite_changed = True
+
+    def hide(self):
+        self.hidden = True
+        self.costumes[self.current_costume_idx].remove()
+
+    def show(self):
+        self.hidden = False
+        self.sprite_changed = True
 
     @classmethod
     def from_pil(cls, pillow_image, **kwargs):
@@ -144,7 +191,7 @@ class Screen:
         # Create a window and put a canvas on it.
         self.root = Tk()
         self.root.resizable(False, False)
-        self.root.title("Scratch v0.1")
+        self.root.title("Scratch v0.2")
         self.canvas = Canvas(self.root, width=width, height=height, bg=bg, borderwidth=0, highlightthickness=0)
         self.canvas.grid(row=1, column=1)
 
@@ -156,16 +203,6 @@ class Screen:
             sprite.draw(self)
         if not self.root.closed:
             self.root.after(100, self.mainloop)
-
-    # def mainloop(self):
-    #     t = Thread(target=self._mainloop, daemon=True)
-    #     t.start()
-
-    # def _mainloop(self):
-    #     while not self.root.tk_dead:
-    #         for sprite in self.sprites:
-    #             sprite.draw(self)
-    #         sleep(0.1)
 
     def geometry(self, pos=(None, None)):
         """
@@ -182,7 +219,7 @@ class Screen:
 
     @property
     def bg(self):
-        raise ValueError("Can't get the value of Screen.bg")
+        raise ValueError("Can't get the value of `Screen.bg`")
 
     @bg.setter
     def bg(self, new_bg):
@@ -204,7 +241,7 @@ class Screen:
         """
         Adds the sprite and keeps it alive.
         """
-        sprite.set_canvas(self.canvas)
+        sprite.register(self)
         self.sprites.append(sprite)
 
 
@@ -231,14 +268,14 @@ if __name__ == "__main__":
         screen.bg = "black"
         screen.register_sprite(sprite)
 
-        hidden = False
+        # hidden = False
 
         while not screen.root.closed:
-            costume.rotate(1)
-            if hidden:
-                costume.show()
-                hidden = False
-            else:
-                costume.hide()
-                hidden = True
+            sprite.rotate(1)
+            # if hidden:
+            #     sprite.show()
+            #     hidden = False
+            # else:
+            #     sprite.hide()
+            #     hidden = True
             sleep(0.1)

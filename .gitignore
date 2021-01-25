@@ -130,4 +130,5 @@ dmypy.json
 
 # Custom
 src/documentation.modpy
+src/Media/*
 debug.txt

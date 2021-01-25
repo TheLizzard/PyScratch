@@ -56,6 +56,13 @@ class Vector:
         """
         return Vector(*(i*other for i in self.data))
 
+    def __truediv__(self, other: int):
+        assert isinstance(other, int), "Other must be an int."
+        """
+        Divides self by the integer and returns the result
+        """
+        return Vector(*(i/other for i in self.data))
+
     def add(self, other):
         """
         Adds self to the other vector and returns the result
