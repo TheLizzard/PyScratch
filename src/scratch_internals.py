@@ -123,7 +123,7 @@ class Sprite(BasicSprite):
         self.show()
 
     def draw(self, screen):
-        if self.sprite_changed:
+        if self.sprite_changed and (not self.hidden):
             costume = self.costumes[self.current_costume_idx]
             costume.draw(tuple(self.pos), rotation=self._rotation, scale=self._scale)
             self.sprite_changed = False
@@ -181,9 +181,6 @@ class Screen:
         """
         Creates a window with the height and width given
         """
-        # Stop `Screen.mainloop()` when the program is closed
-        # to prevent: `Tcl_AsyncDelete: async handler deleted by the wrong thread`
-        #self.running = True
         # All of the sprites on the screen:
         self.sprites = []
         # The size of the screen (used with the physics engine)
@@ -268,14 +265,13 @@ if __name__ == "__main__":
         screen.bg = "black"
         screen.register_sprite(sprite)
 
-        # hidden = False
+        hidden = False
 
         while not screen.root.closed:
             sprite.rotate(1)
-            # if hidden:
-            #     sprite.show()
-            #     hidden = False
-            # else:
-            #     sprite.hide()
-            #     hidden = True
-            sleep(0.1)
+            if hidden:
+                sprite.show()
+            else:
+                sprite.hide()
+            hidden = not hidden
+            sleep(0.2)
