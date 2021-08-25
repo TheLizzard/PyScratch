@@ -7,9 +7,9 @@ from physics import Vector
 from graphics import Costume
 
 
-INTERACT_WITH_PHYSICS = False
+INTERACT_WITH_PHYSICS = True
 INTERACT_WITH_GRAVITY = False
-INTERACT_WITH_GROUND = True
+INTERACT_WITH_GROUND = False
 
 GRAVITY = 9.81
 GROUND = "ground"
@@ -49,27 +49,38 @@ class BasicSprite:
         #    add weight to the forces acting on the object
         #    assuming the object isn't touching the ground
         now_t = datetime.now()
-        delta_t = (self.last_t - now_t).seconds
+        delta_t = now_t - self.last_t
+        delta_t = delta_t.seconds + delta_t.microseconds/10**6
         self.last_t = now_t
-        if INTERACT_WITH_GRAVITY:
-            if (not self.is_touching(GROUND)) or (not INTERACT_WITH_GROUND):
-                weight = Vector(0, GRAVITY*self.mass)
-                self.act(weight)
         # Make the forces act on the object:
         if INTERACT_WITH_PHYSICS:
+            if INTERACT_WITH_GRAVITY:
+                weight = Vector(0, GRAVITY*self.mass)
+                if self.is_touching(GROUND) and INTERACT_WITH_GROUND:
+                    self.v[1] = 0
+                else:
+                    self.act(weight)
             self.a = self.forces/self.mass
             # Change the velocity and position accordingly
             self.v += self.a*delta_t
             self.pos += self.v*delta_t
+            # Reset the forces so that they don't stack up to ∞
+            self.forces.zero()
+            return True # We moved so pls move the sprite
+        return False # No change in position
 
     def is_touching(self, other) -> bool:
         assert self.screen is not None, "This object hasn't been registered with a screen."
         # Check if I am touching the other object.
         # The orther object must be a constant (eg. GROUND) or
         # another Sprite object
+        self.update_sprite_boundaries()
         if other is GROUND:
-            return self.screen.get_height() <= self.upper[1]
+            print(400, self.upper[1]/2+self.pos[1])
+            return self.screen.get_height() <= (self.upper[1]-self.lower[1])/2+self.pos[1]
         else:
+            assert other.screen is not None, "This object hasn't been registered with a screen."
+            other.update_sprite_boundaries()
             self.screen.check_touching(self, other)
 
     def act(self, force: Vector) -> None:
@@ -81,18 +92,36 @@ class BasicSprite:
     def register(self, screen):
         self.screen = screen
 
+    def update_sprite_boundaries(self):
+        pass
+
 
 class Sprite(BasicSprite):
     def __init__(self, sprite_file_location=None, **kwargs):
         super().__init__(**kwargs)
         self.current_costume_idx = 0
-        self.costumes = [Costume(size=(0, 0))]
-        self.costume_details = [self.costumes[0].get_details()]
+        costume = Costume(size=(0, 0))
+        self.costumes = [costume]
+        self.bbox = None
 
         self.sprite_changed = True
         self.hidden = False
         self._rotation = 0
         self.scale = 1
+
+    def when_run(self):
+        # Use like this:
+        #   ```
+        #   sprite = Sprite(...)
+        #   def when_run(sprite):
+        #       ...
+        #   sprite.when_run = when_run
+        #   ```
+        pass
+
+    def bind(self, sequence, function):
+        assert self.screen is not None, "This sprite hasn't been registered."
+        self.screen.bind(sequence, function)
 
     def destroy(self):
         for costume in self.costumes:
@@ -103,7 +132,6 @@ class Sprite(BasicSprite):
         costume = self.costumes[idx]
         costume.remove()
         del self.costumes[idx]
-        del self.costume_details[idx]
 
     def add_costume(self, costume):
         self.costumes.append(costume)
@@ -127,6 +155,17 @@ class Sprite(BasicSprite):
             costume = self.costumes[self.current_costume_idx]
             costume.draw(tuple(self.pos), rotation=self._rotation, scale=self._scale)
             self.sprite_changed = False
+            self.bbox = None
+
+    def update_bbox(self):
+        if self.bbox is None:
+            results = costume.get_details()
+            self.bbox = results["bbox"]
+    
+    def update_sprite_boundaries(self):
+        self.update_bbox()
+        self.lower = self.bbox[:2]
+        self.upper = self.bbox[2:]
 
     def register(self, screen):
         super().register(screen)
@@ -169,6 +208,11 @@ class Sprite(BasicSprite):
         self.hidden = False
         self.sprite_changed = True
 
+    def tick(self):
+        delta_pos = super().tick()
+        if delta_pos:
+            self.sprite_changed = True
+
     @classmethod
     def from_pil(cls, pillow_image, **kwargs):
         sprite = Sprite(**kwargs)
@@ -186,18 +230,21 @@ class Screen:
         # The size of the screen (used with the physics engine)
         self.size = (width, height)
         # Create a window and put a canvas on it.
-        self.root = Tk()
+        self.root = Tk(debug=True, max_fps=60)
         self.root.resizable(False, False)
-        self.root.title("Scratch v0.2")
+        self.root.title("Scratch v0.3")
         self.canvas = Canvas(self.root, width=width, height=height, bg=bg, borderwidth=0, highlightthickness=0)
         self.canvas.grid(row=1, column=1)
 
         self.root.after(100, self.mainloop)
 
+    def bind(self, sequence, function):
+        self.canvas.bind(sequence, function, add=True)
+
     def mainloop(self):
         for sprite in self.sprites:
-            sprite.tick()
             sprite.draw(self)
+            sprite.tick()
         if not self.root.closed:
             self.root.after(100, self.mainloop)
 
@@ -239,6 +286,7 @@ class Screen:
         Adds the sprite and keeps it alive.
         """
         sprite.register(self)
+        sprite.when_run()
         self.sprites.append(sprite)
 
 
@@ -251,27 +299,39 @@ if __name__ == "__main__":
     from time import sleep
 
     # Make this easier pls:
-    image = PIL_Image.new("RGBA", (700, 700))
+    image = PIL_Image.new("RGBA", (200, 200))
     draw = PIL_ImageDraw.Draw(image)
-    draw.line((350, 0, 350, 700), fill="white")
+    draw.rectangle((50, 50, 150, 150), fill="red")
 
     costume = Costume.from_pil(image)
     sprite = Sprite(pos=Vector(200, 200))
     sprite.add_costume(costume)
     sprite.set_costume(1)
 
-    with StackDebug("debug.txt", "all"):
-        screen = Screen()
-        screen.bg = "black"
-        screen.register_sprite(sprite)
+    #with StackDebug("debug.txt", "all"):
+    screen = Screen()
+    screen.bg = "black"
+    screen.register_sprite(sprite)
 
-        hidden = False
+    def left(event):
+        sprite.pos += Vector(-10, 0)
+        sprite.sprite_changed = True
+    def right(event):
+        sprite.pos += Vector(10, 0)
+        sprite.sprite_changed = True
+    def up(event):
+        sprite.pos += Vector(0, 10)
+        sprite.sprite_changed = True
+    def down(event):
+        sprite.pos += Vector(0, -10)
+        sprite.sprite_changed = True
+    sprite.bind("<Key-w>", up)
+    sprite.bind("w", up)
+    sprite.bind("<KeyPress-w>", up)
+    sprite.bind("s", down)
+    sprite.bind("a", left)
+    sprite.bind("d", right)
 
-        while not screen.root.closed:
-            sprite.rotate(1)
-            if hidden:
-                sprite.show()
-            else:
-                sprite.hide()
-            hidden = not hidden
-            sleep(0.2)
+    while not screen.root.closed:
+        # sprite.rotate(1)
+        sleep(0.025)

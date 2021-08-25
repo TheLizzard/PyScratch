@@ -1,5 +1,6 @@
 from PIL import Image as PIL_Image
 from PIL import ImageTk
+import numpy as np
 
 
 class Costume:
@@ -8,36 +9,54 @@ class Costume:
     def __init__(self, size=None):
         self.canvas = None
         if size is not None:
-            self.image = PIL_Image.new("RGBA", size)
-            self.width, self.height = self.image.size
-            self.initialised = True
+            image = PIL_Image.new("RGBA", size)
+            self.init_image(image)
         else:
             self.initialised = False
         # Just for reference
         self.tkimage = None
         self.photoimage = None
 
+    def init_image(self, image):
+        self.image = image
+        self.temp_image = image
+        self.width, self.height = image.size
+        self.initialised = True
+
     def destroy(self):
         del self.image
         del self.photoimage
 
     def get_details(self):
-        return {"bbox": ("x1", "y1", "x2", "y2")}
-        im = np.array(self.temp_image)
-        transparent = [0, 0, 0, 0]
-        xs, ys = np.where(np.all(im != transparent, axis=2))
+        if self.width == self.height == 0:
+            bbox = (0, 0, 0, 0)
+        else:
+            image = np.array(self.temp_image)
+            transparent = (0, 0, 0, 0)
+            xs = []
+            ys = []
+            for x in range(self.width):
+                for y in range(self.height):
+                    colour = tuple(image[x, y])
+                    if colour != transparent:
+                        xs.append(x)
+                        ys.append(y)
+            max_x = max(xs)
+            max_y = max(ys)
+            min_x = min(xs)
+            min_y = min(ys)
+            bbox = (min_x, min_y, max_x, max_y)
+        return {"bbox": bbox}
 
     @classmethod
     def from_pil(cls, pil_image):
         img = Costume()
-        img.image = pil_image
-        img.initialised = True
-        img.width, img.height = pil_image.size
+        img.init_image(pil_image)
         return img
 
     @classmethod
     def open(cls, filename):
-        return Costume(PIL_Image.open(filename))
+        return Costume.from_pil(PIL_Image.open(filename))
 
     @classmethod
     def from_file(cls, filename):
@@ -51,7 +70,6 @@ class Costume:
 
     def remove(self):
         # Deletes the sprite from the screen
-        # but can be restored with `Costume.show()`
         if self.canvas is not None:
             self.canvas.delete(self.tkimage)
         self.tkimage = None

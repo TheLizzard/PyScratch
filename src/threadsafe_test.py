@@ -143,6 +143,7 @@ widgets_test() # Test if the widgets work
 print("Test 4")
 after_script_test() # Test if `after` works properly
 
+
 # from threadsafe import StackDebug
 
 # with StackDebug("debug.txt", "all"):

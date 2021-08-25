@@ -12,7 +12,7 @@ class Button(Widget):
             command = partial(super().call_function_wrapper, command)
         super().__init__()
         master.add_widget(self)
-        super().call_method(self.create_obj, master, command=command, **kwargs)
+        super().call_method(self.create_obj, master, command=command, get=False, **kwargs)
         super().wait_created()
 
     def create_obj(self, master, **kwargs):
@@ -35,7 +35,7 @@ class Label(Widget):
     def __init__(self, master, **kwargs):
         super().__init__()
         master.add_widget(self)
-        super().call_method(self.create_obj, master, **kwargs)
+        super().call_method(self.create_obj, master, get=False, **kwargs)
         super().wait_created()
 
     def create_obj(self, master, **kwargs):
@@ -50,7 +50,7 @@ class Entry(Widget):
     def __init__(self, master, **kwargs):
         super().__init__()
         master.add_widget(self)
-        super().call_method(self.create_obj, master, **kwargs)
+        super().call_method(self.create_obj, master, get=False, **kwargs)
         super().wait_created()
 
     def create_obj(self, master, **kwargs):
@@ -68,10 +68,25 @@ class Canvas(Widget):
     def __init__(self, master, **kwargs):
         super().__init__()
         master.add_widget(self)
-        super().call_method(self.create_obj, master, **kwargs)
+        super().call_method(self.create_obj, master, get=False, **kwargs)
         super().wait_created()
 
     def create_obj(self, master, **kwargs):
         var = _tk.Canvas(master, **kwargs)
+        super().set_var(var)
+        super().copy(exclude=self.UNIMPLEM_METHODS)
+
+
+class Frame(Widget):
+    UNIMPLEM_METHODS = set(tuple())
+
+    def __init__(self, master, **kwargs):
+        super().__init__()
+        master.add_widget(self)
+        super().call_method(self.create_obj, master, get=False, **kwargs)
+        super().wait_created()
+
+    def create_obj(self, master, **kwargs):
+        var = _tk.Frame(master, **kwargs)
         super().set_var(var)
         super().copy(exclude=self.UNIMPLEM_METHODS)
